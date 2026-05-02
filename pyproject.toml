@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flowise-mcp-server"
-version = "0.1.1"
+version = "0.2.0"
 description = "MCP server that exposes Flowise chatflows as tools for AI agents"
 readme = "README.md"
 license = { text = "MIT" }
@@ -37,6 +37,7 @@ classifiers = [
 dependencies = [
     "fastmcp>=2.0.0",
     "httpx>=0.27.0",
+    "psycopg2-binary>=2.9.0",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.5.0",
 ]

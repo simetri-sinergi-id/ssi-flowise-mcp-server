@@ -10,6 +10,7 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from .client import FlowiseClient
+from .retriever import retrieve
 from .settings import Settings, ToolConfig
 
 logger = logging.getLogger(__name__)
@@ -25,9 +26,27 @@ def _slugify(name: str) -> str:
     return slug or "chatflow"
 
 
+def _register_direct_tool(mcp: FastMCP, settings: Settings, tool: ToolConfig) -> None:
+    """Register a tool that queries pgvector + Ollama directly (no Flowise prediction)."""
+
+    @mcp.tool(name=tool.name, description=tool.description)
+    async def _direct_query(
+        query: Annotated[
+            str,
+            Field(description="The search query to find relevant documents"),
+        ],
+    ) -> str:
+        return await retrieve(settings, query)
+
+    logger.info(
+        "Registered MCP tool %r → direct pgvector retrieval (table=%s)",
+        tool.name,
+        settings.pgvector_table,
+    )
+
+
 def _register_tool(mcp: FastMCP, client: FlowiseClient, tool: ToolConfig) -> None:
     """Attach a single Flowise chatflow as an MCP tool on *mcp*."""
-    # Capture tool.id in a local variable so each closure is independent.
     chatflow_id = tool.id
 
     @mcp.tool(name=tool.name, description=tool.description)
@@ -45,9 +64,11 @@ def _register_tool(mcp: FastMCP, client: FlowiseClient, tool: ToolConfig) -> Non
 async def build_server(settings: Settings) -> FastMCP:
     """Create a fully configured :class:`FastMCP` server.
 
-    If ``FLOWISE_TOOLS`` is set, the listed chatflows are registered as tools.
-    If ``FLOWISE_AUTO_DISCOVER`` is true (and ``FLOWISE_TOOLS`` is empty), all
-    chatflows returned by the Flowise API are registered automatically.
+    When ``PGVECTOR_HOST`` / ``OLLAMA_BASE_URL`` are set (direct mode), tools
+    query pgvector + Ollama directly — no Flowise prediction API needed.
+
+    Otherwise, chatflows listed in ``FLOWISE_TOOLS`` or discovered via
+    ``FLOWISE_AUTO_DISCOVER`` are called through the Flowise prediction API.
 
     Args:
         settings: Validated application settings.
@@ -55,6 +76,17 @@ async def build_server(settings: Settings) -> FastMCP:
     Returns:
         A ready-to-run :class:`FastMCP` instance.
     """
+    direct_mode = settings.is_direct_mode()
+    if direct_mode:
+        logger.info(
+            "Direct retrieval mode: pgvector=%s/%s  ollama=%s  table=%s  top_k=%d",
+            settings.pgvector_host,
+            settings.pgvector_db,
+            settings.ollama_base_url,
+            settings.pgvector_table,
+            settings.top_k,
+        )
+
     mcp = FastMCP(
         name="flowise-mcp-server",
         instructions=(
@@ -73,7 +105,10 @@ async def build_server(settings: Settings) -> FastMCP:
 
     if explicit_tools:
         for tool in explicit_tools:
-            _register_tool(mcp, client, tool)
+            if direct_mode:
+                _register_direct_tool(mcp, settings, tool)
+            else:
+                _register_tool(mcp, client, tool)
 
     elif settings.flowise_auto_discover:
         logger.info("Auto-discovering chatflows from %s …", settings.flowise_base_url)
@@ -87,7 +122,10 @@ async def build_server(settings: Settings) -> FastMCP:
                 name=_slugify(flow_name),
                 description=f"Query Flowise chatflow: {flow_name}",
             )
-            _register_tool(mcp, client, tool)
+            if direct_mode:
+                _register_direct_tool(mcp, settings, tool)
+            else:
+                _register_tool(mcp, client, tool)
 
     else:
         logger.warning(

@@ -72,6 +72,25 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── Direct pgvector retrieval mode (optional — bypasses Flowise prediction API) ──
+    # When all pgvector_* and ollama_base_url are set, FLOWISE_TOOLS items
+    # with matching names will use direct retrieval instead of calling Flowise.
+    pgvector_host: str | None = Field(default=None, description="pgvector hostname")
+    pgvector_port: int = Field(default=5432, description="pgvector port")
+    pgvector_db: str | None = Field(default=None, description="pgvector database name")
+    pgvector_user: str | None = Field(default=None, description="pgvector username")
+    pgvector_pass: str | None = Field(default=None, description="pgvector password")
+    pgvector_table: str = Field(default="wiki_docs", description="vector table name")
+    ollama_base_url: str | None = Field(
+        default=None,
+        description="Ollama base URL for embeddings, e.g. http://ollama:11434",
+    )
+    embedding_model: str = Field(
+        default="nomic-embed-text",
+        description="Ollama embedding model name",
+    )
+    top_k: int = Field(default=5, gt=0, description="Number of chunks to return per query")
+
     # ── MCP server ──────────────────────────────────────────────────────────
     mcp_host: str = Field(default="0.0.0.0", description="Host to bind")
     mcp_port: int = Field(default=8000, gt=0, lt=65536, description="Port to listen on")
@@ -91,6 +110,11 @@ class Settings(BaseSettings):
     def strip_trailing_slash(cls, v: str) -> str:
         return v.rstrip("/")
 
+    @field_validator("ollama_base_url")
+    @classmethod
+    def strip_ollama_trailing_slash(cls, v: str | None) -> str | None:
+        return v.rstrip("/") if v else v
+
     @field_validator("mcp_log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:
@@ -109,6 +133,16 @@ class Settings(BaseSettings):
         return v
 
     # ── Helpers ─────────────────────────────────────────────────────────────
+
+    def is_direct_mode(self) -> bool:
+        """Return True when direct pgvector + Ollama retrieval is configured."""
+        return all([
+            self.pgvector_host,
+            self.pgvector_db,
+            self.pgvector_user,
+            self.pgvector_pass,
+            self.ollama_base_url,
+        ])
 
     def get_tools(self) -> list[ToolConfig]:
         """Parse FLOWISE_TOOLS JSON and return validated tool configs."""

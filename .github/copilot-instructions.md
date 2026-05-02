@@ -45,6 +45,7 @@ Also update `pyproject.toml` `[project] version` to match before tagging.
 |---|---|
 | v0.1.0 | Initial release: expose Flowise chatflows as MCP tools |
 | v0.1.1 | Fix .dockerignore excluded README.md (Docker build failure) |
+| v0.2.0 | Add direct pgvector+Ollama retrieval mode (bypass Flowise prediction API) |
 
 ---
 

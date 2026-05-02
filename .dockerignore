@@ -16,5 +16,3 @@ htmlcov/
 tests/
 .env
 *.env
-README.md
-CHANGELOG.md

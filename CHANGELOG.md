@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-08
+
+### Added
+- `fetch_wiki_page` MCP tool: fetch full markdown content of any Wiki.js page by path
+- New `wikijs.py` module with async GraphQL client for Wiki.js `pages.singleByPath`
+- Three new env vars: `WIKIJS_GRAPHQL_URL`, `WIKIJS_API_KEY`, `WIKIJS_LOCALE` (default: `id`)
+- Tool is registered automatically when both `WIKIJS_GRAPHQL_URL` and `WIKIJS_API_KEY` are set
+- Server instructions updated to guide AI agents to use `fetch_wiki_page` when following links from search results
+
 ## [0.2.0] — 2026-05-02
 
 ### Added

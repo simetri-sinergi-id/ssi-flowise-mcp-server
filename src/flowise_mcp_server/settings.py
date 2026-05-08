@@ -91,6 +91,20 @@ class Settings(BaseSettings):
     )
     top_k: int = Field(default=5, gt=0, description="Number of chunks to return per query")
 
+    # ── Wiki.js GraphQL (optional — enables fetch_wiki_page tool) ───────────
+    wikijs_graphql_url: str | None = Field(
+        default=None,
+        description="Wiki.js GraphQL endpoint, e.g. https://wiki.example.com/graphql",
+    )
+    wikijs_api_key: str | None = Field(
+        default=None,
+        description="Wiki.js API key (Admin → API Access)",
+    )
+    wikijs_locale: str = Field(
+        default="id",
+        description="Default locale for page lookups (e.g. 'id' or 'en')",
+    )
+
     # ── MCP server ──────────────────────────────────────────────────────────
     mcp_host: str = Field(default="0.0.0.0", description="Host to bind")
     mcp_port: int = Field(default=8000, gt=0, lt=65536, description="Port to listen on")
@@ -143,6 +157,10 @@ class Settings(BaseSettings):
             self.pgvector_pass,
             self.ollama_base_url,
         ])
+
+    def is_wikijs_configured(self) -> bool:
+        """Return True when Wiki.js GraphQL fetch tool can be registered."""
+        return bool(self.wikijs_graphql_url and self.wikijs_api_key)
 
     def get_tools(self) -> list[ToolConfig]:
         """Parse FLOWISE_TOOLS JSON and return validated tool configs."""

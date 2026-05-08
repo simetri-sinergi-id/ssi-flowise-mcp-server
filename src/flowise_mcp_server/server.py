@@ -12,6 +12,7 @@ from pydantic import Field
 from .client import FlowiseClient
 from .retriever import retrieve
 from .settings import Settings, ToolConfig
+from .wikijs import fetch_page
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,34 @@ def _register_tool(mcp: FastMCP, client: FlowiseClient, tool: ToolConfig) -> Non
     logger.info("Registered MCP tool %r → chatflow %s", tool.name, tool.id)
 
 
+def _register_wikijs_tool(mcp: FastMCP, settings: Settings) -> None:
+    """Register the fetch_wiki_page tool for fetching full Wiki.js page content."""
+
+    @mcp.tool(
+        name="fetch_wiki_page",
+        description=(
+            "Fetch the full markdown content of a Wiki.js page by its path. "
+            "Use this when you need the complete text of a specific page — for example "
+            "when a search result contains a link like /master-data/lokasi/01-membuat "
+            "and you need to read that page in full. "
+            "Path examples: /master-data/lokasi, /instruksi-kerja/lokasi/01-membuat, "
+            "/troubleshoot/stock/stok-tidak-berkurang."
+        ),
+    )
+    async def _fetch_wiki_page(
+        path: Annotated[
+            str,
+            Field(description="Absolute path of the Wiki.js page, e.g. /master-data/lokasi/01-membuat"),
+        ],
+    ) -> str:
+        return await fetch_page(settings, path)
+
+    logger.info(
+        "Registered MCP tool 'fetch_wiki_page' → Wiki.js GraphQL %s",
+        settings.wikijs_graphql_url,
+    )
+
+
 async def build_server(settings: Settings) -> FastMCP:
     """Create a fully configured :class:`FastMCP` server.
 
@@ -91,7 +120,9 @@ async def build_server(settings: Settings) -> FastMCP:
         name="flowise-mcp-server",
         instructions=(
             "This server exposes Flowise chatflows as callable tools. "
-            "Each tool accepts a natural-language query and returns the chatflow's response."
+            "Each tool accepts a natural-language query and returns the chatflow's response. "
+            "When search results contain links to wiki pages, use fetch_wiki_page to retrieve "
+            "the full content of those pages for complete context."
         ),
     )
 
@@ -131,5 +162,8 @@ async def build_server(settings: Settings) -> FastMCP:
         logger.warning(
             "No tools configured. Set FLOWISE_TOOLS or FLOWISE_AUTO_DISCOVER=true."
         )
+
+    if settings.is_wikijs_configured():
+        _register_wikijs_tool(mcp, settings)
 
     return mcp

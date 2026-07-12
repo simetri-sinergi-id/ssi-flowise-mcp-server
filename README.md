@@ -57,6 +57,9 @@ All settings are read from environment variables (or a `.env` file in the workin
 | `FLOWISE_TIMEOUT` | | `60` | HTTP request timeout (seconds) |
 | `FLOWISE_TOOLS` | * | — | JSON array of chatflow configs (see below) |
 | `FLOWISE_AUTO_DISCOVER` | * | `false` | Auto-register all chatflows from Flowise |
+| `WIKIJS_GRAPHQL_URL` | | — | Wiki.js GraphQL endpoint, e.g. `https://wiki.example.com/graphql`. When set together with `WIKIJS_API_KEY`, registers the `fetch_wiki_page` tool. |
+| `WIKIJS_API_KEY` | | — | Wiki.js API key (Admin → API Access) |
+| `WIKIJS_LOCALE` | | `id` | Default locale for page lookups when the path passed to `fetch_wiki_page` has no locale prefix (e.g. `id` or `en`) |
 | `MCP_HOST` | | `0.0.0.0` | Host to bind |
 | `MCP_PORT` | | `8000` | Port to listen on |
 | `MCP_TRANSPORT` | | `streamable-http` | `streamable-http` / `sse` / `stdio` |

@@ -1,5 +1,20 @@
 ## [Unreleased]
 
+## [0.3.1] — 2026-07-13
+
+### Fixed
+- `fetch_wiki_page` always failed (`Page not found`) when given a path with a locale
+  prefix (e.g. `/en/master-data/lokasi`, as shown in search results and browser URLs) —
+  the locale segment was left in the path instead of being passed as the separate
+  `locale` GraphQL argument, so the query never matched any page.
+- Added `_normalise()` helper in `wikijs.py` to split a locale prefix (or a full URL)
+  out of the path, plus a one-shot retry with the original path when the stripped
+  segment turns out to be a real top-level page name rather than a locale code.
+- Error and not-found messages from `fetch_wiki_page` now include the path and locale
+  actually used, to make misconfiguration easier to diagnose.
+- Documented `WIKIJS_LOCALE` in `README.md`'s configuration table (was only in
+  `.env.example`).
+
 ## [0.3.0] — 2026-05-08
 
 ### Added

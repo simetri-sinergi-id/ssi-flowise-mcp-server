@@ -73,13 +73,21 @@ def _register_wikijs_tool(mcp: FastMCP, settings: Settings) -> None:
             "when a search result contains a link like /master-data/lokasi/01-membuat "
             "and you need to read that page in full. "
             "Path examples: /master-data/lokasi, /instruksi-kerja/lokasi/01-membuat, "
-            "/troubleshoot/stock/stok-tidak-berkurang."
+            "/troubleshoot/stock/stok-tidak-berkurang. "
+            "A locale prefix (e.g. /en/master-data/lokasi, as shown in search results and "
+            "browser URLs) or a full URL is also accepted and handled automatically — do not "
+            "strip the locale segment yourself before calling this tool."
         ),
     )
     async def _fetch_wiki_page(
         path: Annotated[
             str,
-            Field(description="Absolute path of the Wiki.js page, e.g. /master-data/lokasi/01-membuat"),
+            Field(
+                description=(
+                    "Path of the Wiki.js page, e.g. /master-data/lokasi/01-membuat. "
+                    "A locale prefix (/en/...) or a full page URL is also accepted."
+                )
+            ),
         ],
     ) -> str:
         return await fetch_page(settings, path)

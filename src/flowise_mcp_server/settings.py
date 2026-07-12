@@ -102,7 +102,11 @@ class Settings(BaseSettings):
     )
     wikijs_locale: str = Field(
         default="id",
-        description="Default locale for page lookups (e.g. 'id' or 'en')",
+        description=(
+            "Default locale for page lookups (e.g. 'id' or 'en'), used when the path "
+            "passed to fetch_wiki_page has no locale prefix (see wikijs.py:_normalise) "
+            "or as the fallback locale on retry."
+        ),
     )
 
     # ── MCP server ──────────────────────────────────────────────────────────

@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
 ### Added
 - Front-door auth for the HTTP transports: Authentik OAuth (`AuthentikProvider`, dynamic
   client registration stays on so the Claude.ai connector only needs the URL) and Bearer

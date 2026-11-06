@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass
 from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,56 @@ class Settings(BaseSettings):
         description="Log level: debug | info | warning | error",
     )
 
+    # ── Front-door auth (HTTP transports only) ──────────────────────────────
+    mcp_base_url: str | None = Field(
+        default=None,
+        description="Public URL of this server (OAuth redirects), e.g. https://mcp.example.com",
+    )
+    authentik_base_url: str | None = Field(default=None, description="Authentik base URL")
+    authentik_app_slug: str | None = Field(
+        default=None, description="Slug of the Authentik OAuth2/OIDC provider application"
+    )
+    authentik_client_id: str | None = Field(default=None, description="Authentik client ID")
+    authentik_client_secret: str | None = Field(
+        default=None, description="Authentik client secret"
+    )
+    mcp_api_key: str | None = Field(
+        default=None,
+        description="Static Bearer API key for non-OAuth clients (enables API-key auth)",
+    )
+    mcp_allow_anonymous: bool = Field(
+        default=False,
+        description="Allow HTTP transports to start with no auth (NOT recommended)",
+    )
+    mcp_state_dir: str | None = Field(
+        default=None,
+        description=(
+            "Directory where the OAuth proxy persists client registrations (mount a "
+            "volume here so they survive container restarts)"
+        ),
+    )
+
     # ── Validators ──────────────────────────────────────────────────────────
+
+    @field_validator("mcp_api_key")
+    @classmethod
+    def validate_api_key(cls, v: str | None) -> str | None:
+        """Reject an empty or whitespace-only API key."""
+        if v is not None and not v.strip():
+            raise ValueError("MCP_API_KEY must not be empty or whitespace")
+        return v
+
+    @model_validator(mode="after")
+    def validate_oauth_complete(self) -> Settings:
+        """Reject partially configured OAuth instead of silently dropping it."""
+        values = self.oauth_values()
+        filled = [k for k, v in values.items() if v and v.strip()]
+        if filled and len(filled) != len(values):
+            missing = sorted(k.upper() for k in values if k not in filled)
+            raise ValueError(
+                "OAuth configuration is incomplete; also set: " + ", ".join(missing)
+            )
+        return self
 
     @field_validator("flowise_base_url")
     @classmethod
@@ -151,6 +200,45 @@ class Settings(BaseSettings):
         return v
 
     # ── Helpers ─────────────────────────────────────────────────────────────
+
+    def oauth_values(self) -> dict[str, str | None]:
+        """Return the five env values that together enable Authentik OAuth."""
+        return {
+            "mcp_base_url": self.mcp_base_url,
+            "authentik_base_url": self.authentik_base_url,
+            "authentik_app_slug": self.authentik_app_slug,
+            "authentik_client_id": self.authentik_client_id,
+            "authentik_client_secret": self.authentik_client_secret,
+        }
+
+    def is_oauth_enabled(self) -> bool:
+        """Return True when all five OAuth env values are set."""
+        return all(v and v.strip() for v in self.oauth_values().values())
+
+    def is_api_key_enabled(self) -> bool:
+        """Return True when ``MCP_API_KEY`` is set."""
+        return bool(self.mcp_api_key)
+
+    def is_auth_enabled(self) -> bool:
+        """Return True when at least one front-door auth mechanism is active."""
+        return self.is_oauth_enabled() or self.is_api_key_enabled()
+
+    def check_auth_policy(self) -> None:
+        """Fail closed: HTTP transports must have auth unless anonymous is allowed.
+
+        Raises:
+            ValueError: transport is ``streamable-http``/``sse``, no auth is
+                configured and ``MCP_ALLOW_ANONYMOUS`` is not true.
+        """
+        if self.mcp_transport == "stdio" or self.is_auth_enabled():
+            return
+        if self.mcp_allow_anonymous:
+            logger.warning("HTTP transport running WITHOUT auth (MCP_ALLOW_ANONYMOUS=true)")
+            return
+        raise ValueError(
+            f"transport {self.mcp_transport!r} requires auth: set MCP_API_KEY and/or the "
+            "OAuth variables (MCP_BASE_URL + AUTHENTIK_*), or MCP_ALLOW_ANONYMOUS=true"
+        )
 
     def is_direct_mode(self) -> bool:
         """Return True when direct pgvector + Ollama retrieval is configured."""

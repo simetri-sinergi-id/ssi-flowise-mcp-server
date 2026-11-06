@@ -1,5 +1,29 @@
 ## [Unreleased]
 
+### Added
+- Front-door auth for the HTTP transports: Authentik OAuth (`AuthentikProvider`, dynamic
+  client registration stays on so the Claude.ai connector only needs the URL) and Bearer
+  API key (`BearerApiKeyVerifier`, constant-time compare), combined with `MultiAuth` when
+  both are active. New env: `MCP_BASE_URL`, `AUTHENTIK_BASE_URL`, `AUTHENTIK_APP_SLUG`,
+  `AUTHENTIK_CLIENT_ID`, `AUTHENTIK_CLIENT_SECRET`, `MCP_API_KEY`, `MCP_ALLOW_ANONYMOUS`,
+  `MCP_STATE_DIR`.
+- `GET /health` (200 `{"status": "ok"}`, no auth) for container health checks.
+- Docker image: `/data` volume holding OAuth client registrations (`MCP_STATE_DIR=/data`).
+
+### Changed
+- **BREAKING:** `streamable-http` / `sse` now refuse to start (`Configuration error`,
+  exit 1) without auth. Set `MCP_API_KEY` and/or the OAuth variables, or
+  `MCP_ALLOW_ANONYMOUS=true`. **Deployments without auth that track the `latest` tag MUST
+  set `MCP_ALLOW_ANONYMOUS=true` before pulling the new image**, or the container will
+  fail to start. `stdio` is unaffected. Partial OAuth config and a blank `MCP_API_KEY`
+  are also start-up errors.
+- HTTP transports are now served by uvicorn from a Starlette app (MCP path stays `/mcp`).
+- `fastmcp` is pinned to `>=3.2,<3.3` (was `>=2.0.0`); `uvicorn>=0.30` added.
+
+### Fixed
+- Two `build_server` tests used the private `_tool_manager` API removed in fastmcp 3.x;
+  they now use `await mcp.list_tools()`. Pre-existing lint errors fixed.
+
 ## [0.3.1] — 2026-07-13
 
 ### Fixed

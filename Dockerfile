@@ -35,11 +35,16 @@ COPY --from=builder /usr/local/bin/flowise-mcp-server \
                     /usr/local/bin/flowise-mcp-server
 
 # Non-root user for least-privilege principle
-RUN useradd --create-home --uid 1000 --shell /bin/bash app
+RUN useradd --create-home --uid 1000 --shell /bin/bash app \
+    && mkdir -p /data && chown app:app /data
 USER app
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    MCP_STATE_DIR=/data
+
+# OAuth client registrations live here; mount a volume so they survive restarts.
+VOLUME ["/data"]
 
 EXPOSE 8000
 

@@ -9,6 +9,7 @@ from typing import Annotated
 from fastmcp import FastMCP
 from pydantic import Field
 
+from .auth_provider import build_auth
 from .client import FlowiseClient
 from .retriever import retrieve
 from .settings import Settings, ToolConfig
@@ -126,6 +127,7 @@ async def build_server(settings: Settings) -> FastMCP:
 
     mcp = FastMCP(
         name="flowise-mcp-server",
+        auth=build_auth(settings),
         instructions=(
             "This server exposes Flowise chatflows as callable tools. "
             "Each tool accepts a natural-language query and returns the chatflow's response. "

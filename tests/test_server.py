@@ -7,6 +7,7 @@ import json
 import httpx
 import pytest
 import respx
+from pydantic import ValidationError
 
 from flowise_mcp_server.server import _slugify, build_server
 from flowise_mcp_server.settings import Settings, ToolConfig
@@ -82,12 +83,12 @@ def test_settings_strips_trailing_slash() -> None:
 
 
 def test_settings_invalid_log_level() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Settings(flowise_base_url=BASE_URL, flowise_api_key=API_KEY, mcp_log_level="VERBOSE")
 
 
 def test_settings_invalid_transport() -> None:
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         Settings(flowise_base_url=BASE_URL, flowise_api_key=API_KEY, mcp_transport="grpc")
 
 
@@ -121,7 +122,7 @@ async def test_build_server_registers_explicit_tools() -> None:
     )
     mcp = await build_server(s)
     # FastMCP exposes registered tools; check via internal dict or list
-    tool_names = [t.name for t in mcp._tool_manager.list_tools()]
+    tool_names = [t.name for t in await mcp.list_tools()]
     assert "my_tool" in tool_names
 
 
@@ -144,7 +145,7 @@ async def test_build_server_auto_discover() -> None:
         flowise_auto_discover=True,
     )
     mcp = await build_server(s)
-    tool_names = [t.name for t in mcp._tool_manager.list_tools()]
+    tool_names = [t.name for t in await mcp.list_tools()]
     assert "wiki_search" in tool_names
     assert "hr_bot" in tool_names
 

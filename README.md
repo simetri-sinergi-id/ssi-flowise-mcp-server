@@ -64,8 +64,48 @@ All settings are read from environment variables (or a `.env` file in the workin
 | `MCP_PORT` | | `8000` | Port to listen on |
 | `MCP_TRANSPORT` | | `streamable-http` | `streamable-http` / `sse` / `stdio` |
 | `MCP_LOG_LEVEL` | | `info` | `debug` / `info` / `warning` / `error` |
+| `MCP_API_KEY` | ** | — | Static Bearer API key for non-OAuth clients (must not be blank) |
+| `MCP_BASE_URL` | ** | — | Public URL of this server (OAuth) |
+| `AUTHENTIK_BASE_URL` | ** | — | Authentik base URL (OAuth) |
+| `AUTHENTIK_APP_SLUG` | ** | — | Slug of the Authentik OAuth2/OIDC provider (OAuth) |
+| `AUTHENTIK_CLIENT_ID` | ** | — | Authentik client ID (OAuth) |
+| `AUTHENTIK_CLIENT_SECRET` | ** | — | Authentik client secret (OAuth) |
+| `MCP_ALLOW_ANONYMOUS` | | `false` | Allow HTTP transports to start without auth (trusted networks only) |
+| `MCP_STATE_DIR` | | fastmcp user-data dir (`/data` in the image) | Where OAuth client registrations are persisted |
 
 *Either `FLOWISE_TOOLS` or `FLOWISE_AUTO_DISCOVER=true` must be set.
+
+**Auth (`streamable-http` / `sse`):** the server refuses to start (exit 1,
+`Configuration error`) unless `MCP_API_KEY` and/or the five OAuth variables
+(`MCP_BASE_URL` + the four `AUTHENTIK_*`) are set, or `MCP_ALLOW_ANONYMOUS=true`.
+OAuth is all-or-nothing: a partial set is a start-up error. `stdio` is exempt.
+Who may log in is decided by the Authentik policy bound to the application.
+
+### Authentication
+
+- **Claude.ai connector (OAuth):** set the OAuth variables, then add the connector with
+  only the URL (`https://<host>/mcp`) — Client ID/secret are not needed because dynamic
+  client registration stays enabled (`/.well-known/oauth-authorization-server`). In
+  Authentik, register `https://<MCP_BASE_URL host>/auth/callback` as the redirect URI.
+- **Other clients:** send `Authorization: Bearer <MCP_API_KEY>`.
+- `GET /health` → `200 {"status": "ok"}`, no credentials, no pgvector/Ollama access.
+- Both can be active at once. Requests to `/mcp` without a valid token get `401`.
+
+#### OAuth storage (persist this)
+
+The OAuth proxy (`fastmcp` 3.2) keeps dynamically registered clients and issued-token
+state in an encrypted file store under `MCP_STATE_DIR` (default: fastmcp's user-data
+dir). The encryption and JWT signing keys are derived from `AUTHENTIK_CLIENT_SECRET`, so
+they are stable across restarts, but the files themselves are lost when the container is
+recreated — Claude.ai would then have to reconnect. The Docker image sets
+`MCP_STATE_DIR=/data` (owned by the non-root user); mount a volume there:
+
+```yaml
+volumes:
+  - flowise-mcp-state:/data
+```
+
+Rotating `AUTHENTIK_CLIENT_SECRET` invalidates stored state (clients re-register).
 
 ### FLOWISE_TOOLS format
 
@@ -199,10 +239,13 @@ flowise-mcp-server/
 │       ├── __main__.py     # python -m support
 │       ├── cli.py          # entry point
 │       ├── settings.py     # pydantic-settings config
+│       ├── auth_provider.py # Authentik OAuth + API-key verifier
+│       ├── asgi.py         # Starlette app: MCP + /health
 │       ├── client.py       # async Flowise HTTP client
 │       └── server.py       # FastMCP server factory
 ├── tests/
 │   ├── conftest.py
+│   ├── test_auth.py
 │   ├── test_client.py
 │   └── test_server.py
 ├── Dockerfile
